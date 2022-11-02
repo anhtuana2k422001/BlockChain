@@ -1,12 +1,20 @@
 const SHA256 = require('crypto-js/sha256');
 
+// Lớp giao dịch 
+class Transaction{
+    constructor(fromAdress, toAdress, amount){
+        this.fromAdress = fromAdress; 
+        this.toAdress = toAdress;
+        this.amount = amount;
+    }
+}
+
 class Block{
-    // data: Bao gồm các dữ liệu bất kỳ 
+    // transactions: Bao gồm các dữ liệu bất kỳ 
     // previousMash : chuỗi băm trước của 1 block
-    constructor(index, data, previousMash = ''){
-        this.index = index;
-        this.timestamp = new Date();
-        this.data = data;
+    constructor(timestamp, transactions , previousMash = ''){
+        this.timestamp = timestamp;
+        this.transactions  = transactions ;
         this.previousMash = previousMash;
         this.hash = this.caculateHash();
         this.nonce = 0;
@@ -14,7 +22,7 @@ class Block{
 
     // tính toán xử lý hàm băm
     caculateHash(){
-        return SHA256(this.index + this.previousMash + this.timestamp + JSON.stringify(this.data) + this.nonce).toString();
+        return SHA256(this.previousMash + this.timestamp + JSON.stringify(this.transactions) + this.nonce).toString();
     }
 
     // Độ khó của mã  khối 
@@ -32,12 +40,14 @@ class Block{
 class BlockChain{
     constructor(){
         this.chain  = [this.createGenesisBlock()];
-        this.difficulty = 4;
+        this.difficulty = 2;
+        this.pendingTransactions = []; // chứa giao dịch chờ xử lý
+        this.miningReward = 100; // Phần thưởng khai thác thành công một khối
     }
 
     // Hàm Tạo block 
     createGenesisBlock(){
-        return new Block(0, {value: 170000}, "");
+        return new Block("02/10/2022","Genesis Block", "0");
     }
 
     // Hàm lấy block cuối cùng
@@ -45,12 +55,46 @@ class BlockChain{
         return this.chain[this.chain.length - 1];
     }
 
-    // Hàm thêm block
-    addBlock(newBlock){
-        newBlock.previousMash =  this.getLatestBlock().hash;
-        // newBlock.hash = newBlock.caculateHash(); 
-        newBlock.mineBlock(this.difficulty);
-        this.chain.push(newBlock);
+    // Địa chỉ gửi phần thưởng nếu khai thác thành công
+    miniPendingTransactions(miningRewardAddress){
+        let block = new Block(Date.now(), this.pendingTransactions);
+        block.mineBlock(this.difficulty);
+
+        console.log("Block success mined");
+        this.chain.push(block);
+
+        this.pendingTransactions = [
+            new Transaction(null, miningRewardAddress, this.miningReward)
+        ];
+
+    }
+
+
+    // Hàm tạo giao dịch 
+    createTransaction(transaction){
+        this.pendingTransactions.push(transaction);
+    }
+    
+    // Hàm lấy số dư của các nhân theo các giao dịch
+    getBalanceOfAddress(adress){
+        let balance = 0;
+        // 1 chain có nhiều block
+        // Trong block sẽ có nhiều giao dịch
+        for(const block of this.chain){
+            for(const trans of block.transactions){
+                // Mếu chuyển cho người khác thì trừ số dư
+                if(trans.fromAdress === adress){
+                    balance -= trans.amount;
+                }
+
+                // Nhân nhận từ người khác thì cộng vào số dư
+                if(trans.toAdress === adress){
+                    balance += trans.amount;
+                }
+            }
+        }
+
+        return balance;
     }
 
     // Hàm kiểm tra hợp lệ của chuỗi block
@@ -74,15 +118,18 @@ class BlockChain{
 
 }
 
-let savjeeCoin = new BlockChain();
-console.log("Mining block 1: ....");
-savjeeCoin.addBlock(new Block(1, {value: 1460000}));
-console.log("Mining block 2: ....");
-savjeeCoin.addBlock(new Block(2, {value: 1130000}));
+let Coin = new BlockChain();
+Coin.createTransaction(new Transaction('adress1', 'adress2', 100));
+Coin.createTransaction(new Transaction('adress1', 'adress2', 50));
 
+console.log("\nStarting the mine ....");
+Coin.miniPendingTransactions('tuan-adress');
+console.log("\nBalance of tuan is: ", Coin.getBalanceOfAddress('tuan-adress'));
 
-// console.log("Is blockchain Valid ? " + savjeeCoin.isChainValid());
-// savjeeCoin.chain[1].data = {value: 14000};
-// savjeeCoin.chain[1].hash = savjeeCoin.chain[1].caculateHash();
-// console.log("Is blockchain Valid ? " + savjeeCoin.isChainValid());
-// console.log(JSON.stringify(savjeeCoin, null, 4));
+console.log("\nStarting the mine again 1 ....");
+Coin.miniPendingTransactions('tuan-adress');
+console.log("\nBalance of tuan is: ", Coin.getBalanceOfAddress('tuan-adress'));
+
+console.log("\nStarting the mine again 2....");
+Coin.miniPendingTransactions('tuan-adress');
+console.log("\nBalance of tuan is: ", Coin.getBalanceOfAddress('tuan-adress'));
